@@ -35,6 +35,7 @@ public class GroundClick : MonoBehaviour
         mesh.vertices = vertices;
         mesh.triangles = triangles;
 
+        mesh.Optimize();
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
 
