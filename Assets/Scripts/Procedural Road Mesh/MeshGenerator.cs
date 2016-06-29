@@ -13,6 +13,9 @@ public class MeshGenerator : UniqueMesh
 
     public int segmentCount = 10;
 
+
+    float[] arr;
+
     void Awake()
     {
 
@@ -30,6 +33,8 @@ public class MeshGenerator : UniqueMesh
 
         Vertex2D[] verts = new Vertex2D[points.Length];
 
+
+
         for (int i = 0; i < points.Length; ++i)
         {
             verts[i] = new Vertex2D();
@@ -45,6 +50,9 @@ public class MeshGenerator : UniqueMesh
                 Vector2 direction = points[i + 1].position - points[i].position;
                 verts[i].normal = new Vector2(-direction.y, direction.x);
             }
+
+            verts[i].uCoord = 1.0f * i / (points.Length - 1);
+
         }
 
         int[] lines = new int[(points.Length - 1) * 2];
@@ -80,7 +88,7 @@ public class MeshGenerator : UniqueMesh
 
             Vector3 normal = CubicBezier3D.GetNormal3D(controlPoints, t, Vector3.up);
             //debug info
-            Debug.DrawLine(position, position + normal * 5, Color.blue);
+            // Debug.DrawLine(position, position + normal * 5, Color.blue);
 
             if (i != 0)
             {
@@ -89,6 +97,9 @@ public class MeshGenerator : UniqueMesh
 
             lastPoint = position;
         }
+
+        arr = new float[2];
+        CalcLengthTableInto(arr, controlPoints);
         Extrude(mesh, shape, path);
     }
 
@@ -117,8 +128,10 @@ public class MeshGenerator : UniqueMesh
                 vertices[id] = path[i].LocalToWorld(shape.vert2Ds[j].point);
                 normals[id] = path[i].LocalToWorldDirection(shape.vert2Ds[j].normal);
 
-                Debug.DrawLine(vertices[id], vertices[id] + normals[id].normalized, Color.gray);
-                uvs[id] = new Vector2(shape.vert2Ds[j].uCoord, i / ((float)edgeLoops));
+                // Debug.DrawLine(vertices[id], vertices[id] + normals[id].normalized, Color.gray);
+                //uvs[id] = new Vector2(shape.vert2Ds[j].uCoord, i / ((float)edgeLoops));
+                //uvs[id] = new Vector2(shape.vert2Ds[j].uCoord, arr.Sample(i / ((float)edgeLoops)));
+                uvs[id] = new Vector2(shape.vert2Ds[j].uCoord, path.Length * i / ((float)edgeLoops));
             }
         }
 
@@ -133,14 +146,14 @@ public class MeshGenerator : UniqueMesh
                 int b = offset + lines[l];
                 int c = offset + lines[l + 1];
                 int d = offset + lines[l + 1] + vertsInShape;
-              
+
                 triangleIndices[ti] = b; ti++;
                 triangleIndices[ti] = a; ti++;
                 triangleIndices[ti] = c; ti++;
                 triangleIndices[ti] = c; ti++;
                 triangleIndices[ti] = a; ti++;
                 triangleIndices[ti] = d; ti++;
-               
+
             }
         }
 
@@ -149,6 +162,46 @@ public class MeshGenerator : UniqueMesh
         mesh.vertices = vertices;
         mesh.triangles = triangleIndices;
         mesh.normals = normals;
-       // mesh.uv = uvs;
+        mesh.uv = uvs;
+    }
+
+
+    void CalcLengthTableInto(float[] arr, Vector3[] pts)
+    {
+        arr[0] = 0f;
+        float totalLength = 0f;
+        Vector3 prev = pts[0];
+        for (int i = 1; i < arr.Length; i++)
+        {
+            float t = ((float)i) / (arr.Length - 1);
+            Vector3 pt = CubicBezier3D.GetPoint(pts, t);
+            float diff = (prev - pt).magnitude;
+            totalLength += diff;
+            arr[i] = totalLength;
+            prev = pt;
+        }
+    }
+}
+
+public static class FloatArrayExtensions
+{
+    public static float Sample(this float[] fArr, float t)
+    {
+        int count = fArr.Length;
+        if (count == 0)
+        {
+            Debug.LogError("Unable to sample array - it has no elements");
+            return 0;
+        }
+        if (count == 1)
+            return fArr[0];
+        float iFloat = t * (count - 1);
+        int idLower = Mathf.FloorToInt(iFloat);
+        int idUpper = Mathf.FloorToInt(iFloat + 1);
+        if (idUpper >= count)
+            return fArr[count - 1];
+        if (idLower < 0)
+            return fArr[0];
+        return Mathf.Lerp(fArr[idLower], fArr[idUpper], iFloat - idLower);
     }
 }
